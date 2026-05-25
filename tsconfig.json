@@ -1,0 +1,614 @@
+import React, { useState, useEffect } from 'react';
+import { Megaphone, Calendar, Clock, HelpCircle, AlertTriangle, LayoutGrid, ClipboardList, BellRing, Users, LogOut, Star } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { useMockApp, STAFF_TASK_LABELS, TABLES } from '../../lib/MockAppContext';
+import { cn } from '../../lib/utils';
+import { TableCard } from '../../components/ui/TableCard';
+import { TableNumberLabel } from '../../components/ui/TableNumberLabel';
+import { RotationLabel } from '../../components/ui/RotationLabel';
+import { RotationTab } from '../../components/ui/RotationTab';
+import { StaffTaskPlacementBoard } from '../../components/ui/StaffTaskPlacementBoard';
+import { OpeningAnimation } from '../../components/opening/OpeningAnimation';
+import { EmployeeClock } from '../../components/ui/EmployeeClock';
+
+export function DashboardHome() {
+  const { currentUser, eventStatus, currentRotationNumber, rotationAssignments, users, staffTasks, announcements, triggerEmergencyCall } = useMockApp();
+
+  const [staffActiveTab, setStaffActiveTab] = useState<number>(currentRotationNumber || 1);
+
+  // Sync active tab when current rotation changes (optional, but good UX)
+  useEffect(() => {
+    if (currentRotationNumber && currentUser?.role === 'staff') {
+      setStaffActiveTab(currentRotationNumber);
+    }
+  }, [currentRotationNumber, currentUser?.role]);
+
+  const getCast = (castId?: string) => users.find(u => u.id === castId);
+  const getStaff = (staffId: string) => users.find(u => u.id === staffId);
+
+  const activeAnnouncements = announcements.filter(a => a.isActive);
+  const latestAnnouncement = activeAnnouncements.length > 0 
+    ? [...activeAnnouncements].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0]
+    : null;
+
+  // Common Announcement Component
+  const AnnouncementSection = () => (
+    <div className="space-y-3">
+      <div className="flex justify-between items-center">
+        <h3 className="font-bold text-[#d4af37] flex items-center gap-2">
+          <Megaphone size={18} />
+          アナウンス
+        </h3>
+        <Link to="/app/announcements" className="text-[10px] text-gray-500 hover:text-[#d4af37] transition flex items-center gap-1">
+          履歴を見る <Clock size={10} />
+        </Link>
+      </div>
+      {latestAnnouncement ? (
+        <div key={latestAnnouncement.id} className={cn("p-4 rounded-xl border flex flex-col gap-1", latestAnnouncement.type === 'normal' ? "bg-blue-500/10 border-blue-500/30 text-blue-100" : latestAnnouncement.type === 'important' ? "bg-[#d4af37]/10 border-[#d4af37]/30 text-[#d4af37]" : "bg-red-500/10 border-red-500/30 text-red-200")}>
+          <div className="font-bold text-lg flex items-center gap-2">
+            {latestAnnouncement.type === 'emergency' && <AlertTriangle size={18} className="text-red-500" />}
+            {latestAnnouncement.title}
+          </div>
+          <div className="text-sm opacity-90 whitespace-pre-wrap">{latestAnnouncement.body}</div>
+        </div>
+      ) : (
+        <div className="bg-black/50 border border-white/10 rounded-xl p-4 text-center text-gray-400 text-sm italic">
+          （現在表示するアナウンスはありません）
+        </div>
+      )}
+    </div>
+  );
+
+  // Staff Specific View
+  const StaffHomeView = () => {
+    // Current event status applies here
+    const currentStatusText = eventStatus === 'before_open' ? '営業前' :
+      eventStatus === 'closed' ? '営業終了' :
+      `第${currentRotationNumber}ローテ`;
+
+    const activeStatus = eventStatus === 'closed' ? 'rotation_4' : eventStatus;
+    const myTasks = staffTasks.find(st => st.staffId === currentUser?.id && st.statusType === activeStatus)?.tasks || [];
+    
+    return (
+      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        {/* Profile / Status Header */}
+        <div className="bg-[linear-gradient(135deg,#1a1a1a,#050505)] p-6 rounded-2xl border border-[#d4af37]/20 shadow-xl overflow-hidden relative">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-[#d4af37] opacity-5 rounded-full blur-3xl"></div>
+          <div className="absolute top-4 right-4 z-20">
+            <EmployeeClock />
+          </div>
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4 mt-6 md:mt-0 pr-0 md:pr-32">
+            <div>
+              <p className="text-[#d4af37] text-xs font-bold tracking-[0.2em] mb-1">STAFF DASHBOARD</p>
+              <h2 className="text-2xl font-bold text-white flex items-center gap-2 flex-wrap">
+                あなたの現在の担当 <span className="text-sm font-normal text-gray-400 bg-black/40 px-2 py-1 rounded">({currentStatusText})</span>
+              </h2>
+            </div>
+            <div className="flex gap-2">
+              <Link to="/app/staff" className="flex items-center gap-2 px-4 py-2 bg-[#d4af37]/10 border border-[#d4af37]/30 rounded-lg text-[#d4af37] text-xs font-bold hover:bg-[#d4af37]/20 transition">
+                <ClipboardList size={14} /> 注文確認
+              </Link>
+            </div>
+          </div>
+
+          <div className="mt-6 flex flex-wrap gap-2 relative z-10">
+            {eventStatus === 'closed' ? (
+              <span className="text-gray-500 italic text-sm">本日の営業は終了しました</span>
+            ) : myTasks.length > 0 ? (
+              myTasks.map(task => (
+                <span key={task} className="px-4 py-2 bg-[#d4af37] text-black rounded-lg font-bold text-sm shadow-lg shadow-[#d4af37]/20">
+                  {STAFF_TASK_LABELS[task]}
+                </span>
+              ))
+            ) : (
+              <span className="text-gray-500 italic text-sm">現在の状態での担当項目は未設定です</span>
+            )}
+          </div>
+        </div>
+
+        {/* Fellow Staff for same tasks */}
+        {myTasks.length > 0 && eventStatus !== 'closed' && (
+          <div className="space-y-3">
+            <h3 className="font-bold text-white flex items-center gap-2 text-sm">
+              <Users size={16} className="text-[#d4af37]" />
+              同じ担当のスタッフ
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {myTasks.map(task => {
+                const others = staffTasks
+                  .filter(st => st.staffId !== currentUser?.id && st.statusType === activeStatus && st.tasks.includes(task))
+                  .map(st => getStaff(st.staffId))
+                  .filter(Boolean);
+                
+                if (others.length === 0) return null;
+
+                return (
+                  <div key={task} className="bg-white/5 border border-white/10 rounded-xl p-3">
+                    <div className="text-[10px] text-[#d4af37] font-bold mb-2 uppercase tracking-wider">{STAFF_TASK_LABELS[task]}</div>
+                    <div className="flex flex-wrap gap-2">
+                      {others.map(s => s && (
+                        <div key={s.id} className="flex items-center gap-2 bg-black/40 px-2 py-1 rounded-full border border-white/5">
+                          {s.iconUrl ? <img src={s.iconUrl} className="w-5 h-5 rounded-full object-cover" /> : <div className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-[8px]">S</div>}
+                          <span className="text-xs text-white truncate max-w-[80px]">{s.displayName}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        <AnnouncementSection />
+
+        {/* Full Staff Task Board & Cast Placement Board with Tabs */}
+        <div className="space-y-6 pt-4">
+          <div className="flex items-center justify-between border-b border-white/10 pb-4">
+            <h3 className="font-bold text-white text-lg flex items-center gap-2">
+              <LayoutGrid className="text-[#d4af37]" size={20} />
+              全体配置一覧
+            </h3>
+            <div className="flex gap-4">
+              <Link to="/app/members" className="text-xs text-[#d4af37] hover:underline flex items-center gap-1">
+                スタンプ・会員管理
+              </Link>
+              <Link to="/app/placement" className="text-xs text-[#d4af37] hover:underline flex items-center gap-1">
+                全画面で見る
+              </Link>
+            </div>
+          </div>
+          
+          {/* Tabs */}
+          <div className="flex overflow-x-auto gap-2 pb-2 scrollbar-none cursor-grab active:cursor-grabbing pb-4 pt-2">
+            {[0, 1, 2, 3, 4].map(rot => (
+              <RotationTab
+                key={rot}
+                label={rot === 0 ? '営業前' : `第${rot}ローテ`}
+                isActive={staffActiveTab === rot}
+                isCurrent={currentRotationNumber === rot && !eventStatus.startsWith('before')}
+                onClick={() => setStaffActiveTab(rot)}
+              />
+            ))}
+          </div>
+
+          <div className="space-y-8">
+            {/* Cast Placement for Tab */}
+            <div className="space-y-4 pt-2">
+              <h4 className="text-sm font-bold text-gray-300">第{staffActiveTab}ローテ キャスト配置</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {TABLES.map(table => {
+                  const assignment = rotationAssignments.find(a => a.rotationNumber === staffActiveTab && a.tableId === table);
+                  const casts = [getCast(assignment?.castId1), getCast(assignment?.castId2), getCast(assignment?.castId3)];
+                  const hasCast = casts.some(Boolean);
+                  if (!hasCast) return null; // Only show tables with casts on staff dashboard to save space
+                  
+                  return (
+                    <div key={table} className="bg-black/40 border border-white/10 rounded-xl p-3 flex flex-col gap-2">
+                      <TableNumberLabel tableId={table} className="text-xs py-0.5 w-fit" />
+                      <div className="space-y-1 mt-1">
+                        {casts.map((c, i) => c && (
+                          <div key={i} className="text-xs flex items-center gap-2">
+                            <span className="text-gray-500 w-10">担当{i+1}: </span>
+                            <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                               <div className="w-5 h-5 rounded-full overflow-hidden shrink-0 border border-white/10 bg-black">
+                                 {c.iconUrl ? <img src={c.iconUrl} className="w-full h-full object-cover" /> : <div className="text-[10px] w-full h-full flex items-center justify-center text-white">C</div>}
+                               </div>
+                               <span className="text-white truncate">{c.displayName}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Staff Tasks for Tab */}
+            <div className="space-y-4">
+              <h4 className="text-sm font-bold text-gray-300">第{staffActiveTab}ローテ スタッフ担当</h4>
+              <StaffTaskPlacementBoard highlightCurrentUserId={currentUser?.id} activeStatus={('rotation_' + staffActiveTab) as any} />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Cast Specific View
+  const CastHomeView = () => {
+    // Determine active rotation logically
+    const activeRotForCalc = (eventStatus === 'before_open' || eventStatus === 'closed') ? currentRotationNumber || 1 : currentRotationNumber;
+    
+    // Assignment for current rotation
+    const currentAssignment = rotationAssignments.find(a => a.rotationNumber === activeRotForCalc && (a.castId1 === currentUser?.id || a.castId2 === currentUser?.id || a.castId3 === currentUser?.id));
+    const position = currentAssignment?.castId1 === currentUser?.id ? 1 : currentAssignment?.castId2 === currentUser?.id ? 2 : currentAssignment?.castId3 === currentUser?.id ? 3 : null;
+
+    // other casts
+    const otherCasts = currentAssignment ? [
+      currentAssignment.castId1 !== currentUser?.id ? getCast(currentAssignment.castId1) : null,
+      currentAssignment.castId2 !== currentUser?.id ? getCast(currentAssignment.castId2) : null,
+      currentAssignment.castId3 !== currentUser?.id ? getCast(currentAssignment.castId3) : null
+    ].filter(Boolean) : [];
+
+    // Next rotation
+    const nextRotNum = currentRotationNumber ? (currentRotationNumber < 4 ? currentRotationNumber + 1 : null) : (eventStatus === 'before_open' ? 1 : null);
+    const nextAssignment = nextRotNum ? rotationAssignments.find(a => a.rotationNumber === nextRotNum && (a.castId1 === currentUser?.id || a.castId2 === currentUser?.id || a.castId3 === currentUser?.id)) : null;
+    const nextPosition = nextAssignment?.castId1 === currentUser?.id ? 1 : nextAssignment?.castId2 === currentUser?.id ? 2 : nextAssignment?.castId3 === currentUser?.id ? 3 : null;
+
+    // All assignments
+    const myAssignments = ([0, 1, 2, 3, 4] as any).map((rot: number) => {
+      const a = rotationAssignments.find(x => x.rotationNumber === rot && (x.castId1 === currentUser?.id || x.castId2 === currentUser?.id || x.castId3 === currentUser?.id));
+      const pos = a?.castId1 === currentUser?.id ? 1 : a?.castId2 === currentUser?.id ? 2 : a?.castId3 === currentUser?.id ? 3 : null;
+      return { rot, tableId: a?.tableId, pos };
+    });
+
+    const handleEmergencyButton = () => {
+      if (!currentAssignment || !currentUser) {
+        alert("現在配置されている卓がないため、送信できません。");
+        return;
+      }
+      if (confirm(`【緊急ヘルプ】\n現在の卓(${currentAssignment.tableId})へスタッフを呼びますか？`)) {
+        triggerEmergencyCall({
+          tableId: currentAssignment.tableId,
+          tableNameSnapshot: currentAssignment.tableId,
+          castUserId: currentUser.id,
+          castNameSnapshot: currentUser.displayName,
+          castIconSnapshot: currentUser.iconUrl,
+          rotationNumberSnapshot: activeRotForCalc || 1,
+          message: '緊急ヘルプ要請'
+        });
+        alert("緊急ヘルプを送信しました。スタッフが向かいます。");
+      }
+    };
+
+    return (
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        
+        {/* A. Hero セクション */}
+        <div className="relative overflow-hidden rounded-3xl border border-[#d4af37]/30 bg-[#0a0505] shadow-[0_0_40px_rgba(212,175,55,0.1)] p-6 md:p-8 text-center flex flex-col items-center">
+          {/* Spotlight Effect */}
+          <div className="absolute -top-1/2 left-1/2 -translate-x-1/2 w-full max-w-md aspect-square bg-[#d4af37] opacity-20 rounded-full blur-[100px] pointer-events-none"></div>
+          
+          <div className="absolute top-4 right-4 z-20">
+            <EmployeeClock />
+          </div>
+
+          <div className="relative z-10 space-y-2 mt-4 md:mt-0">
+            <h1 className="text-xl md:text-2xl font-lux text-white drop-shadow-md">
+              Welcome back, <span className="text-[#d4af37]">{currentUser?.displayName}</span>
+            </h1>
+            
+            <div className="inline-flex flex-col items-center mt-4 p-4 md:px-8 md:py-4 bg-black/60 rounded-2xl border border-white/10 backdrop-blur-md">
+              <span className="text-[#d4af37] text-[10px] font-black tracking-widest uppercase mb-1">
+                {eventStatus === 'before_open' ? 'OPENING SOON' : eventStatus === 'closed' ? 'CLOSED' : 'LIVE STATUS'}
+              </span>
+              <div className="text-white text-lg md:text-xl font-bold flex items-center gap-2">
+                {eventStatus !== 'closed' && eventStatus !== 'before_open' && <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>}
+                現在：{eventStatus === 'before_open' ? '営業前' : eventStatus === 'closed' ? '営業終了' : `第${currentRotationNumber}ローテ`}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {eventStatus === 'before_open' ? (
+          <div className="glass-panel p-6 rounded-2xl border border-[#d4af37]/20 text-center">
+            <Clock className="w-12 h-12 text-[#d4af37]/50 mx-auto mb-4" />
+            <h3 className="text-[#d4af37] font-bold text-lg mb-2">営業開始までお待ちください</h3>
+            <p className="text-gray-400 text-sm">本日のあなたの担当予定を全体配置ボードから確認してください。</p>
+          </div>
+        ) : eventStatus === 'closed' ? (
+          <div className="glass-panel p-6 rounded-2xl border-white/10 text-center">
+            <LogOut className="w-12 h-12 text-gray-500 mx-auto mb-4" />
+            <h3 className="text-white font-bold text-lg mb-2">本日の営業は終了しました</h3>
+            <p className="text-gray-400 text-sm">お疲れさまでした。</p>
+          </div>
+        ) : (
+          <>
+            {/* B. 現在の担当カード */}
+            {currentAssignment ? (
+              <div className="relative overflow-hidden bg-gradient-to-br from-[#1a1515] to-[#0a0505] p-6 rounded-3xl border-2 border-[#d4af37] border-t-[#ebd282] border-l-[#ebd282] shadow-2xl flex flex-col md:flex-row gap-6 items-center">
+                <div className="flex-1 w-full text-center md:text-left space-y-4">
+                  <div>
+                    <p className="text-[#d4af37] text-xs font-bold tracking-widest mb-1 shadow-black drop-shadow-md">現在の担当卓</p>
+                    <div className="flex items-baseline justify-center md:justify-start gap-2">
+                      <span className="text-white text-lg font-bold">卓：</span>
+                      <span className="text-[#d4af37] text-5xl font-black font-sans tracking-tighter drop-shadow-lg">{currentAssignment.tableId}</span>
+                    </div>
+                  </div>
+                  <div>
+                    <span className="inline-block bg-white/10 text-white font-bold px-4 py-1 rounded-full text-sm border border-white/20">
+                      担当キャスト {position}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="w-full md:w-1/2 bg-black/40 rounded-2xl p-4 border border-white/5 flex flex-col gap-3">
+                  <h4 className="text-gray-400 text-xs font-bold tracking-widest">同じ卓のキャスト</h4>
+                  <div className="grid grid-cols-1 gap-2">
+                    {otherCasts.length > 0 ? otherCasts.map((c, i) => c && (
+                      <div key={c.id || i} className="flex items-center gap-3 bg-white/5 px-3 py-2 rounded-xl border border-white/10">
+                         <div className="w-8 h-8 rounded-full overflow-hidden bg-black/50 border border-white/10 shrink-0 flex items-center justify-center">
+                           {c.iconUrl ? <img src={c.iconUrl} className="w-full h-full object-cover" /> : <span className="text-xs text-white">C</span>}
+                         </div>
+                         <strong className="text-white font-sans">{c.displayName}</strong>
+                      </div>
+                    )) : (
+                      <div className="text-sm text-gray-500 italic py-2">他キャストはいません</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="glass-panel p-8 rounded-3xl border border-white/10 text-center flex flex-col items-center">
+                <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-4 border border-white/10">
+                  <Calendar className="text-gray-400 w-8 h-8" />
+                </div>
+                <h3 className="text-white font-bold text-lg mb-1">未配置 / 休憩中</h3>
+                <p className="text-gray-500 text-sm">現在のローテーションでは担当卓がありません。</p>
+              </div>
+            )}
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* C. 次のローテ予定 */}
+              <div className="glass-panel p-5 rounded-2xl border border-white/10 shadow-lg">
+                 <h3 className="text-white font-bold text-sm mb-3 border-b border-white/10 pb-2 flex items-center gap-2">
+                   <Clock size={16} className="text-blue-400" />
+                   次の予定
+                 </h3>
+                 {nextRotNum ? (
+                   <div className="flex justify-between items-center bg-black/40 p-3 rounded-xl border border-white/5">
+                     <span className="text-gray-400 text-sm font-bold">第{nextRotNum}ローテ</span>
+                     {nextAssignment ? (
+                       <div className="text-right">
+                         <div className="text-white font-black font-sans text-lg">卓：{nextAssignment.tableId}</div>
+                         <div className="text-[#d4af37] text-xs font-bold">担当 {nextPosition}</div>
+                       </div>
+                     ) : (
+                       <span className="text-gray-500 font-bold">未配置 / 休憩</span>
+                     )}
+                   </div>
+                 ) : (
+                   <div className="text-center py-4 text-gray-500 italic text-sm">次のローテーションはありません</div>
+                 )}
+              </div>
+
+              {/* F. 緊急ヘルプボタン */}
+              <div className="glass-panel p-5 rounded-2xl border border-red-500/20 bg-red-950/30 flex flex-col justify-center items-center gap-3 shadow-lg">
+                <h3 className="text-red-400 font-bold text-sm tracking-widest uppercase">トラブル・ヘルプ要請</h3>
+                <button 
+                  onClick={handleEmergencyButton}
+                  className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-black py-4 rounded-xl shadow-[0_0_20px_rgba(220,38,38,0.4)] border border-red-400/30 transition-all active:scale-95 flex items-center justify-center gap-2"
+                >
+                  <AlertTriangle size={20} />
+                  緊急ヘルプを呼ぶ
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* D. 本日のローテ予定 */}
+        <div className="glass-panel p-6 md:p-8 rounded-3xl border border-white/10 shadow-xl overflow-hidden relative">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-[#d4af37] opacity-5 rounded-full blur-[50px] pointer-events-none"></div>
+          <h3 className="text-white font-bold text-lg mb-6 flex items-center gap-2 relative z-10">
+            <Calendar size={20} className="text-[#d4af37]" />
+            本日のあなたの予定
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 relative z-10">
+            {myAssignments.map(({ rot, tableId, pos }) => {
+              const isCurrent = rot === currentRotationNumber;
+              const isPast = currentRotationNumber && rot < currentRotationNumber;
+              const isNext = rot === nextRotNum;
+              
+              return (
+                <div key={rot} className={cn(
+                  "p-4 rounded-2xl border transition-all duration-300 relative overflow-hidden",
+                  isCurrent ? "bg-[#d4af37]/10 border-[#d4af37]/50 shadow-[0_0_15px_rgba(212,175,55,0.15)]" : 
+                  isPast ? "bg-white/5 border-white/5 opacity-50" : 
+                  "bg-black/60 border-white/10 hover:border-white/20"
+                )}>
+                  {isCurrent && <div className="absolute top-0 left-0 w-1 h-full bg-[#d4af37]"></div>}
+                  <div className="flex justify-between items-center mb-3">
+                    <span className={cn("text-xs font-bold", isCurrent ? "text-[#d4af37]" : "text-gray-400")}>第{rot}ローテ</span>
+                    {isCurrent && <span className="bg-[#d4af37] text-black text-[10px] font-black px-2 py-0.5 rounded-full animate-pulse shadow-md">現在</span>}
+                    {isNext && <span className="bg-blue-500/20 text-blue-400 border border-blue-500/30 text-[10px] font-black px-2 py-0.5 rounded-full">次</span>}
+                  </div>
+                  {tableId ? (
+                    <div>
+                       <div className={cn("font-black font-sans text-2xl tracking-tighter", isCurrent ? "text-white drop-shadow-md" : "text-gray-300")}>卓：{tableId}</div>
+                       <div className={cn("text-xs mt-2", isCurrent ? "text-[#d4af37] font-bold" : "text-gray-500")}>担当キャスト {pos}</div>
+                    </div>
+                  ) : (
+                    <div className="text-gray-500 text-sm font-bold italic py-3">未配置 / 休憩</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Utils */}
+        <div className="flex justify-center flex-wrap gap-4 pt-2">
+          <Link to="/app/placement" className="inline-flex items-center gap-2 px-8 py-4 bg-white/5 border border-white/10 rounded-full text-white text-sm font-bold hover:bg-white/10 transition group shadow-lg">
+            <LayoutGrid size={18} className="text-[#d4af37] group-hover:scale-110 transition-transform" /> 
+            全体配置ボードを見る
+          </Link>
+          <Link to="/app/members" className="inline-flex items-center gap-2 px-8 py-4 bg-white/5 border border-white/10 rounded-full text-white text-sm font-bold hover:bg-white/10 transition group shadow-lg">
+            <Star size={18} className="text-[#d4af37] group-hover:scale-110 transition-transform" />
+            スタンプ・会員管理
+          </Link>
+          <Link to="/app/profile" className="inline-flex items-center gap-2 px-8 py-4 bg-white/5 border border-white/10 rounded-full text-white text-sm font-bold hover:bg-white/10 transition group shadow-lg">
+            <Users size={18} className="text-blue-400 group-hover:scale-110 transition-transform" />
+            プロフィール編集
+          </Link>
+        </div>
+
+        {/* E. アナウンス */}
+        <AnnouncementSection />
+      </div>
+    );
+  };
+
+  // Admin Specific View
+  const AdminHomeView = () => {
+    return (
+      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="flex flex-col md:flex-row gap-4 items-center justify-between border-b border-[#d4af37]/20 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-[#d4af37]/20 rounded-xl flex items-center justify-center text-[#d4af37] border border-[#d4af37]/30">
+              <Calendar size={20} />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white flex items-center gap-3">運営管理ダッシュボード <EmployeeClock /></h2>
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                LIVE STATUS
+              </div>
+            </div>
+          </div>
+          <Link to="/app/admin" className="px-6 py-2 bg-[#d4af37] text-black font-bold rounded-lg text-sm transition hover:brightness-110 shadow-lg shadow-[#d4af37]/20">
+            管理メニューを開く
+          </Link>
+        </div>
+
+        {/* Current status summary */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="glass-panel p-4 rounded-xl border border-white/10">
+            <div className="text-gray-500 text-[10px] font-bold uppercase tracking-widest mb-1">Event Status</div>
+            <div className="text-sm font-bold text-white">{eventStatus === 'before_open' ? '営業前' : eventStatus === 'closed' ? '営業終了' : '営業中'}</div>
+          </div>
+          <div className="glass-panel p-4 rounded-xl border border-white/10">
+            <div className="text-gray-500 text-[10px] font-bold uppercase tracking-widest mb-1">Active Rotation</div>
+            <div className="text-sm font-bold text-[#d4af37]">{currentRotationNumber ? `第${currentRotationNumber}ローテ` : '未設定'}</div>
+          </div>
+          <div className="glass-panel p-4 rounded-xl border border-white/10">
+            <div className="text-gray-500 text-[10px] font-bold uppercase tracking-widest mb-1">Active Orders</div>
+            <div className="text-sm font-bold text-white">0 件</div>
+          </div>
+          <div className="glass-panel p-4 rounded-xl border border-white/10">
+            <div className="text-gray-500 text-[10px] font-bold uppercase tracking-widest mb-1">Active Announcements</div>
+            <div className="text-sm font-bold text-white">{activeAnnouncements.length} 件</div>
+          </div>
+        </div>
+
+        {/* Side by Side Boards */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+          {/* Cast Rotation Summary */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between border-b border-white/10 pb-2">
+              <h3 className="font-bold text-white flex items-center gap-2">
+                <RotationLabel rotationNumber={currentRotationNumber || 1} className="scale-75 origin-left" />
+                キャスト配置
+              </h3>
+              <Link to="/app/placement" className="text-[10px] text-[#d4af37] hover:underline uppercase tracking-wide">詳細を見る</Link>
+            </div>
+            <div className="max-h-[500px] overflow-y-auto scrollbar-thin pr-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {TABLES.map(table => {
+                const assignment = rotationAssignments.find(a => a.rotationNumber === (currentRotationNumber || 1) && a.tableId === table);
+                const casts = [getCast(assignment?.castId1), getCast(assignment?.castId2), getCast(assignment?.castId3)];
+                const hasCast = casts.some(Boolean);
+                
+                return (
+                  <div key={table} className={cn("p-3 rounded-xl border flex flex-col gap-2", hasCast ? "bg-white/5 border-white/10" : "bg-black/20 border-white/5 opacity-40")}>
+                    <TableNumberLabel tableId={table} className="text-xs py-0.5 w-fit" />
+                    <div className="space-y-1">
+                      {casts.map((c, i) => (
+                        <div key={i} className="text-[10px] flex items-center gap-2">
+                          <span className="text-gray-600">#{i+1}</span>
+                          <span className={c ? "text-white" : "text-gray-700 italic"}>{c?.displayName || '未設定'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Staff Task Board */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between border-b border-white/10 pb-2">
+              <h3 className="font-bold text-white">スタッフ担当配置 <span className="text-[10px] text-gray-500 font-normal ml-2">({eventStatus === 'before_open' ? '営業前' : eventStatus === 'closed' ? '営業終了' : `第${currentRotationNumber}ローテ`})</span></h3>
+              <Link to="/app/admin" className="text-[10px] text-[#d4af37] hover:underline uppercase tracking-wide">編集する</Link>
+            </div>
+            <StaffTaskPlacementBoard className="grid-cols-1 sm:grid-cols-2 lg:grid-cols-2" activeStatus={eventStatus === 'closed' ? 'rotation_4' : eventStatus} />
+          </div>
+        </div>
+
+        <AnnouncementSection />
+      </div>
+    );
+  };
+
+  // Customer / Default Home View
+  const CustomerHomeView = () => (
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="bg-[linear-gradient(135deg,#7b1113,#2a0001)] p-8 rounded-3xl border border-[#d4af37]/30 shadow-2xl text-center relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-48 h-48 bg-[#d4af37] opacity-10 rounded-full blur-[100px] pointer-events-none"></div>
+        <div className="relative z-10">
+          <h2 className="text-4xl font-lux text-[#d4af37] mb-2 tracking-[0.2em] drop-[#d4af37]/20">Nakiya_Bar</h2>
+          <p className="text-white/60 tracking-[0.3em] text-[10px] mb-8 font-black uppercase">Established 2024</p>
+          <div className="inline-flex flex-col items-center justify-center p-6 bg-black/60 rounded-3xl border border-[#d4af37]/50 backdrop-blur-2xl shadow-inner">
+             <span className="text-[#d4af37] text-[10px] font-black tracking-[0.4em] uppercase mb-3 opacity-80">Store Status</span>
+             <div className="text-2xl sm:text-3xl font-black text-white px-10 py-1">
+               {eventStatus === 'before_open' ? 'OPENING SOON' : eventStatus === 'closed' ? 'CLOSED' : 'OPEN NOW'}
+             </div>
+             {currentRotationNumber && <RotationLabel rotationNumber={currentRotationNumber} isCurrent className="mt-4" />}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Link to="/app/order" className="group relative overflow-hidden rounded-2xl aspect-[16/6] md:aspect-video flex items-center justify-center border border-white/10 transition-all hover:border-[#d4af37]/50">
+          <div className="absolute inset-0 bg-black/60 group-hover:bg-black/40 transition-colors z-10"></div>
+          <img src="https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&w=800&q=80" className="absolute inset-0 w-full h-full object-cover scale-105 group-hover:scale-100 transition-transform duration-700" alt="Order" />
+          <div className="relative z-20 text-center">
+            <h3 className="text-white text-2xl font-black italic tracking-widest group-hover:scale-110 transition-transform">ORDER MENU</h3>
+            <p className="text-[#d4af37] text-xs font-bold mt-1">注文ページへ</p>
+          </div>
+        </Link>
+        <Link to="/app/placement" className="group relative overflow-hidden rounded-2xl aspect-[16/6] md:aspect-video flex items-center justify-center border border-white/10 transition-all hover:border-blue-500/50">
+          <div className="absolute inset-0 bg-black/60 group-hover:bg-black/40 transition-colors z-10"></div>
+          <img src="https://images.unsplash.com/photo-1543007630-9710e4a00a20?auto=format&fit=crop&w=800&q=80" className="absolute inset-0 w-full h-full object-cover scale-105 group-hover:scale-100 transition-transform duration-700" alt="Placement" />
+          <div className="relative z-20 text-center">
+            <h3 className="text-white text-2xl font-black italic tracking-widest group-hover:scale-110 transition-transform">PLACEMENT</h3>
+            <p className="text-blue-400 text-xs font-bold mt-1">キャスト配置を確認</p>
+          </div>
+        </Link>
+      </div>
+
+      <AnnouncementSection />
+    </div>
+  );
+
+  return (
+    <div className="max-w-5xl mx-auto px-4 pb-24">
+      {eventStatus === 'closed' ? <ClosedView /> : (
+        <>
+          {currentUser?.role === 'staff' && StaffHomeView()}
+          {currentUser?.role === 'cast' && CastHomeView()}
+          {currentUser?.role === 'admin' && AdminHomeView()}
+          {((currentUser?.role === 'customer' || !currentUser) && currentUser?.approvalStatus === 'approved') && CustomerHomeView()}
+        </>
+      )}
+    </div>
+  );
+}
+
+// Separate Closed View for tidiness
+const ClosedView = () => (
+  <div className="space-y-8 animate-in fade-in duration-700 py-12 text-center">
+    <div className="w-20 h-20 bg-gray-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-white/5">
+      <LogOut size={40} className="text-gray-600" />
+    </div>
+    <div className="space-y-2">
+      <h2 className="text-3xl font-lux text-white tracking-widest">CLOSED</h2>
+      <p className="text-gray-500">本日の営業は終了いたしました。</p>
+    </div>
+    <div className="pt-8">
+       <Link to="/app/placement" className="text-sm text-[#d4af37] border-b border-[#d4af37]/30 pb-1 hover:text-white transition">本日の配置履歴を見る</Link>
+    </div>
+  </div>
+);

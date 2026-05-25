@@ -1,0 +1,142 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and permissions",
+      "type": "object",
+      "properties": {
+        "loginId": { "type": "string" },
+        "userCode": { "type": "string" },
+        "displayName": { "type": "string" },
+        "vrcName": { "type": "string" },
+        "iconUrl": { "type": "string" },
+        "role": { "type": "string", "enum": ["customer", "staff", "cast", "admin", "pending"] },
+        "requestedRole": { "type": ["string", "null"], "enum": ["staff", "cast", "admin", "null"] },
+        "canCreateOrder": { "type": "boolean" },
+        "assignedTableId": { "type": "string" },
+        "approvalStatus": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "isDeleted": { "type": "boolean" },
+        "deletedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["loginId", "displayName", "vrcName", "role", "approvalStatus", "canCreateOrder", "createdAt"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Customer order",
+      "type": "object",
+      "properties": {
+        "tableId": { "type": "string" },
+        "creatorId": { "type": "string" },
+        "castId": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "processing", "completed", "delivered"] },
+        "totalAmount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["tableId", "creatorId", "status", "totalAmount", "createdAt"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Menu items",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "price": { "type": "number" },
+        "isAvailable": { "type": "boolean" },
+        "recipe_text": { "type": "string", "description": "Internal recipe for staff and cast" }
+      },
+      "required": ["name", "category", "price", "isAvailable"]
+    },
+    "HistoryResetLog": {
+      "title": "HistoryResetLog",
+      "description": "Log of data maintenance operations",
+      "type": "object",
+      "properties": {
+        "resetType": { "type": "string", "enum": ["orders", "announcements", "emergency_calls", "rotation_history", "all"] },
+        "targetTables": { "type": "array", "items": { "type": "string" } },
+        "deletedCount": { "type": "number" },
+        "executedBy": { "type": "string" },
+        "executedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "ShiftRequest": {
+      "title": "ShiftRequest",
+      "description": "Admin creates a shift request for a specific date",
+      "type": "object",
+      "properties": {
+        "businessDate": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": ["string", "null"] },
+        "status": { "type": "string", "enum": ["open", "closed", "canceled"] },
+        "deadlineAt": { "type": ["string", "null"], "format": "date-time" },
+        "createdBy": { "type": "string" },
+        "createdByNameSnapshot": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "canceledAt": { "type": ["string", "null"], "format": "date-time" },
+        "canceledBy": { "type": ["string", "null"] },
+        "cancelReason": { "type": ["string", "null"] },
+        "isDeleted": { "type": "boolean" }
+      },
+      "required": ["businessDate", "title", "status", "createdBy", "createdByNameSnapshot", "createdAt", "updatedAt", "isDeleted"]
+    },
+    "AttendanceRequest": {
+      "title": "AttendanceRequest",
+      "description": "Records employee attendance submissions",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "shiftRequestId": { "type": "string" },
+        "businessDate": { "type": "string" },
+        "status": { "type": "string", "enum": ["present", "absent", "late", "leave_early"] },
+        "time": { "type": "string" },
+        "memo": { "type": "string" },
+        "attendanceRole": { "type": "string", "enum": ["admin", "staff", "cast", "off"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string" }
+      },
+      "required": ["userId", "shiftRequestId", "businessDate", "status", "createdAt", "updatedAt", "updatedBy"]
+    },
+    "GlobalState": {
+      "title": "GlobalState",
+      "description": "Global event state like current rotation",
+      "type": "object",
+      "properties": {
+        "eventStatus": { "type": "string" },
+        "currentRotationNumber": { "type": ["number", "null"] }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles. Contains role and approval status."
+    },
+    "/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/Order" },
+      "description": "Orders created by staff or customers."
+    },
+    "/products/{productId}": {
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "Available products on the menu."
+    },
+    "/global/state": {
+      "schema": { "$ref": "#/entities/GlobalState" },
+      "description": "Global event status."
+    },
+    "/historyResetLogs/{logId}": {
+      "schema": { "$ref": "#/entities/HistoryResetLog" },
+      "description": "Logs of data reset operations."
+    },
+    "/shiftRequests/{shiftId}": {
+      "schema": { "$ref": "#/entities/ShiftRequest" },
+      "description": "Shift requests created by admin."
+    },
+    "/attendanceRequests/{logId}": {
+      "schema": { "$ref": "#/entities/AttendanceRequest" },
+      "description": "Records employee attendance submissions."
+    }
+  }
+}
